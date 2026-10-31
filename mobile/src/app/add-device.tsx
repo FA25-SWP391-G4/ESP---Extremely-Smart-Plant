@@ -21,11 +21,11 @@ export default function AddDeviceScreen() {
   // Check connection to SmartPlant_AP
   async function checkSmartPlantConnection() {
     setLoading(true);
-    setStatus('Checking connection to http://192.168.4.1...');
+    setStatus('Checking connection to http://192.168.4.1/status...');
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 6000);
+      const timeout = setTimeout(() => controller.abort(), 8000);
 
       const res = await fetch('http://192.168.4.1/status', {
         signal: controller.signal,
@@ -42,13 +42,9 @@ export default function AddDeviceScreen() {
           return;
         }
       }
-      setStatus('⚠️ Could not reach SmartPlant_AP. Are you connected to its Wi-Fi?');
+      setStatus('⚠️ Could not reach SmartPlant_AP at 192.168.4.1. Please ensure your phone is connected to "SmartPlant_AP" Wi-Fi.');
     } catch {
-      setStatus('⚠️ Device not reachable directly at 192.168.4.1. Proceeding to credentials entry.');
-      setTimeout(() => {
-        setDeviceIp('192.168.4.1');
-        setStep(2);
-      }, 1000);
+      setStatus('❌ Not connected to SmartPlant_AP. Please go to your phone\'s Wi-Fi settings, join the "SmartPlant_AP" network, then tap this button again.');
     } finally {
       setLoading(false);
     }
@@ -63,7 +59,7 @@ export default function AddDeviceScreen() {
     for (const ip of commonIps) {
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 2000);
+        const timeout = setTimeout(() => controller.abort(), 2500);
         const res = await fetch(`http://${ip}/status`, { signal: controller.signal });
         clearTimeout(timeout);
 
@@ -80,9 +76,7 @@ export default function AddDeviceScreen() {
     }
 
     if (!found) {
-      setStatus('ℹ️ Switched to manual Wi-Fi credential pairing.');
-      setDeviceIp('192.168.4.1');
-      setStep(2);
+      setStatus('❌ No ESP32 device found on common addresses. Please ensure you are connected to "SmartPlant_AP", or tap "Enter IP manually".');
     }
     setLoading(false);
   }
@@ -95,35 +89,72 @@ export default function AddDeviceScreen() {
     }
 
     setLoading(true);
-    setStatus('Sending Wi-Fi credentials to ESP32 device...');
+    setStatus(`Sending Wi-Fi credentials to ESP32 at http://${deviceIp}/config...`);
 
     const currentUser = authStore.getUser();
     const userId = currentUser?.user_id || '1';
 
-    // 1. Direct device AP POST (if connected to SmartPlant_AP)
+    const payload = {
+      ssid: ssid.trim(),
+      password: password.trim(),
+      userId: String(userId),
+    };
+
+    let sentSuccessfully = false;
+    let errorMessage = '';
+
+    // 1. Direct device AP POST (send JSON directly to ESP32)
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 6000);
+      const timeout = setTimeout(() => controller.abort(), 10000);
 
-      const form = new URLSearchParams();
-      form.append('ssid', ssid);
-      form.append('password', password);
-      form.append('userId', String(userId));
-
-      await fetch(`http://${deviceIp}/config`, {
+      const res = await fetch(`http://${deviceIp}/config`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/plain, */*',
         },
-        body: form.toString(),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
       clearTimeout(timeout);
-    } catch {
-      // Offline fallback
+
+      if (res.ok) {
+        sentSuccessfully = true;
+      } else {
+        const text = await res.text().catch(() => '');
+        // If device returned 415 or 400, retry with urlencoded form data as fallback
+        if (res.status === 415 || res.status === 400) {
+          const form = new URLSearchParams();
+          form.append('ssid', ssid.trim());
+          form.append('password', password.trim());
+          form.append('userId', String(userId));
+
+          const resForm = await fetch(`http://${deviceIp}/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: form.toString(),
+          });
+          if (resForm.ok) {
+            sentSuccessfully = true;
+          } else {
+            errorMessage = `Device responded with status ${res.status}: ${text || res.statusText}`;
+          }
+        } else {
+          errorMessage = `Device responded with status ${res.status}: ${text || res.statusText}`;
+        }
+      }
+    } catch (err: any) {
+      errorMessage = err?.message || 'Could not connect to device';
     }
 
-    // 2. Also register device with backend database
+    if (!sentSuccessfully) {
+      setLoading(false);
+      setStatus(`❌ Failed to send credentials to ESP32 at http://${deviceIp}/config.\nAre you still connected to SmartPlant_AP?\nError: ${errorMessage}`);
+      return;
+    }
+
+    // 2. Also register device with backend database if online
     try {
       await api.devices.configure({
         deviceIp,
@@ -133,10 +164,10 @@ export default function AddDeviceScreen() {
         deviceId: `ESP32_${ssid.trim().replace(/\s+/g, '_')}`,
       });
     } catch (e) {
-      console.log('[ADD DEVICE] Backend proxy staging notice:', e);
+      console.log('[ADD DEVICE] Backend proxy staging notice (offline mode expected):', e);
     }
 
-    setStatus('✅ Configuration complete! Device registered in database.');
+    setStatus('✅ Wi-Fi configuration accepted by ESP32! Please disconnect from SmartPlant_AP and reconnect to your regular Wi-Fi.');
     setLoading(false);
     setStep(3);
   }
@@ -242,7 +273,11 @@ export default function AddDeviceScreen() {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => setStep(2)}
+                  onPress={() => {
+                    setDeviceIp('192.168.4.1');
+                    setStatus('Manual mode: Enter your ESP32 IP and Wi-Fi credentials.');
+                    setStep(2);
+                  }}
                   className="flex-1 bg-[#0F172A] border border-[#334155] py-3 rounded-xl items-center justify-center active:opacity-90"
                 >
                   <Text className="text-gray-200 font-semibold text-xs">Enter IP manually</Text>
