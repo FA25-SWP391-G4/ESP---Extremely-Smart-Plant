@@ -16,40 +16,42 @@ const getLatestSensorData = async (req, res) => {
         let params = [];
         
         if (userId) {
-    query = `
-        WITH cleaned_data AS (
-            SELECT 
-                TRIM(sd.device_key) AS device_key,
-                sd.timestamp,
-                sd.soil_moisture AS moisture,
-                sd.temperature,
-                sd.air_humidity AS humidity,
-                sd.light_intensity AS light,
-                TRIM(d.device_key) AS dev_key,
-                d.device_name,
-                p.plant_id,
-                p.custom_name AS plant_name,
-                p.user_id
-            FROM 
-                sensors_data sd
-            JOIN 
-                devices d ON TRIM(sd.device_key) = TRIM(d.device_key)
-            LEFT JOIN 
-                plants p ON TRIM(d.device_key) = TRIM(p.device_key)
-            )
-            SELECT DISTINCT ON (device_key)
-                device_key, timestamp, moisture, temperature, humidity, light,
-                device_name, plant_id, plant_name
-            FROM cleaned_data
-            WHERE user_id = $1
-            ORDER BY device_key, timestamp DESC;
-        `;
-        params = [userId];
+            query = `
+                WITH cleaned_data AS (
+                    SELECT 
+                        TRIM(sd.device_key) AS device_key,
+                        sd.data_id,
+                        sd.timestamp,
+                        sd.soil_moisture AS moisture,
+                        sd.temperature,
+                        sd.air_humidity AS humidity,
+                        sd.light_intensity AS light,
+                        TRIM(d.device_key) AS dev_key,
+                        d.device_name,
+                        p.plant_id,
+                        p.custom_name AS plant_name,
+                        p.user_id
+                    FROM 
+                        sensors_data sd
+                    JOIN 
+                        devices d ON TRIM(sd.device_key) = TRIM(d.device_key)
+                    LEFT JOIN 
+                        plants p ON TRIM(d.device_key) = TRIM(p.device_key)
+                )
+                SELECT DISTINCT ON (device_key)
+                    device_key, data_id, timestamp, moisture, temperature, humidity, light,
+                    device_name, plant_id, plant_name
+                FROM cleaned_data
+                WHERE user_id = $1
+                ORDER BY device_key, data_id DESC;
+            `;
+            params = [userId];
         } else {
             query = `
                 WITH cleaned_data AS (
                     SELECT 
                         TRIM(sd.device_key) AS device_key,
+                        sd.data_id,
                         sd.timestamp,
                         sd.soil_moisture AS moisture,
                         sd.temperature,
@@ -63,9 +65,9 @@ const getLatestSensorData = async (req, res) => {
                         devices d ON TRIM(sd.device_key) = TRIM(d.device_key)
                 )
                 SELECT DISTINCT ON (device_key)
-                    device_key, timestamp, moisture, temperature, humidity, light, device_name
+                    device_key, data_id, timestamp, moisture, temperature, humidity, light, device_name
                 FROM cleaned_data
-                ORDER BY device_key, timestamp DESC;
+                ORDER BY device_key, data_id DESC;
             `;
         }
 

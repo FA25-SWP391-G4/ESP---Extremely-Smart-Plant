@@ -3,7 +3,7 @@ import Cookies from "js-cookie";
 import { setupRedirectInterceptor } from "@/utils/redirectHandler";
 
 // Ensure the API URL has the correct structure with protocol and no trailing slash
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL ? process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, '') : (process.env.NODE_ENV === 'development' ? 'http://localhost:3010' : '');
 
 // Only log in development mode
 const isDev = process.env.NODE_ENV === 'development';

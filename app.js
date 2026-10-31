@@ -179,7 +179,7 @@ var sensorRouter = require('./routes/sensor');      // 🔄 Sensor data manageme
 var plantRouter = require('./routes/plants');        // ✅ UC5-9: Plant management & watering (implemented)
 var adminRouter = require('./routes/admin');        // 🔄 UC24-31: Admin functions
 var deviceRouter = require('./routes/device');      // IoT device management API
-//var notificationRouter = require('./routes/notifications'); // 🔄 UC10: Real-time notifications
+var notificationRouter = require('./routes/notifications'); // 🔄 UC10: Real-time notifications
 // var languageRouter = require('./routes/language');  // 🔄 UC31: Multi-language settings (tạm thời vô hiệu hóa)
 
 // TODO: Create additional route modules for remaining use cases:
@@ -198,18 +198,35 @@ var app = express();
 // app.set('views', path.join(__dirname, 'views'));
 // app.set('view engine', 'jade');
 
-// Configure CORS to allow Next.js (port 3000), Expo Web (port 8081), and local network mobile devices
+// Configure CORS to allow Next.js (port 3000), Expo Web (port 8081), Vercel deployments, and local network mobile devices
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:8081',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:8081',
+  'https://esp-extremely-smart-plant.vercel.app',
 ];
+
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
+}
+
+if (process.env.ALLOWED_ORIGINS) {
+  process.env.ALLOWED_ORIGINS.split(',').forEach(o => {
+    const trimmed = o.trim().replace(/\/$/, '');
+    if (trimmed) allowedOrigins.push(trimmed);
+  });
+}
 
 app.use(cors({
   origin: function (origin, callback) {
     // Allow non-browser requests (mobile apps, curl, postman)
     if (!origin) return callback(null, true);
+
+    let isVercelDomain = false;
+    try {
+      isVercelDomain = /\.vercel\.app$/.test(new URL(origin).hostname);
+    } catch (_) {}
 
     if (
       allowedOrigins.includes(origin) ||
@@ -217,11 +234,12 @@ app.use(cors({
       origin.startsWith('http://127.0.0.1:') ||
       origin.startsWith('http://192.168.') ||
       origin.startsWith('http://10.') ||
+      isVercelDomain ||
       process.env.NODE_ENV !== 'production'
     ) {
       return callback(null, true);
     }
-    return callback(new Error('Not allowed by CORS'));
+    return callback(new Error('Not allowed by CORS: ' + origin));
   },
   credentials: true, // Allow credentials (cookies, authorization headers, etc)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allowed HTTP methods
@@ -265,27 +283,50 @@ app.use(express.static(path.join(__dirname, 'client/build')));
 
 
 
+// Health check endpoint for hosting platforms (Render, etc.)
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Mount route handlers
 app.use('/', indexRouter);                          // Basic routes
 app.use('/users', usersRouter);                     // User routes (basic)
 app.use('/auth', authRouter);                       // ✅ UC11: Authentication routes (password reset)
 app.use('/auth/google', googleAuthRouter);          // ✅ UC12: Google OAuth authentication routes
 app.use('/api/settings', settingsRouter);           // ✅ UC13: User settings management
+app.use('/settings', settingsRouter);
 app.use('/payment', paymentRouter);                 // ✅ UC19, UC22: VNPay payment integration
-app.use('/api/ai', aiRouter);                       // ✅ UC17-18, UC20-21, UC23, UC30: AI API (implemented)                   // 🔄 UC32-34: IoT API
+app.use('/api/ai', aiRouter);                       // ✅ UC17-18, UC20-21, UC23, UC30: AI API (implemented)
+app.use('/ai', aiRouter);
 app.use('/api/sensor', sensorRouter);               // 🔄 Sensor data management API
+app.use('/sensor', sensorRouter);
 app.use('/api/upload', require('./routes/upload')); // File upload API
 
-// TODO: Mount additional route handlers as they are implemented:
+// Dual route handlers for /api/* and root paths
 app.use('/api/dashboard', dashboardRouter);      // 🔄 UC4: Dashboard API
+app.use('/dashboard', dashboardRouter);
 app.use('/api/plants', plantRouter);              // 🔄 UC5-9: Plant management API
+app.use('/plants', plantRouter);
 app.use('/api/zones', zoneRouter);              // 🔄 UC14: Zone management API
+app.use('/zones', zoneRouter);
 app.use('/api/reports', require('./routes/reportsRoutes')); // ✅ Reports API with charts and export
+app.use('/reports', require('./routes/reportsRoutes'));
 app.use('/api/plans', require('./routes/plans')); // ✅ Subscription plans API
+app.use('/plans', require('./routes/plans'));
 app.use('/api/subscriptions', require('./routes/subscriptions')); // ✅ Subscription management API
+app.use('/subscriptions', require('./routes/subscriptions'));
 app.use('/api/plant-profiles', plantProfileRouter); // Plant profile database API
+app.use('/plant-profiles', plantProfileRouter);
 app.use('/api/devices', deviceRouter);          // IoT device management API
+app.use('/devices', deviceRouter);
 app.use('/api/admin', adminRouter);             // ✅ UC24-31: Admin functions
+app.use('/admin', adminRouter);
+app.use('/api/notifications', notificationRouter); // 🔄 UC10: Real-time notifications
+app.use('/notifications', notificationRouter);
 // app.use('/api/report', reportRouter);            // 🔄 UC8-9, UC15, UC17: Reports API
 // app.use('/api/premium', premiumRouter);          // 🔄 UC14-23: Premium features API
 
@@ -299,29 +340,26 @@ app.use('/api/admin', adminRouter);             // ✅ UC24-31: Admin functions
 // - MQTT client for IoT communication
 
 
-// Serve React app for client-side routing
+// Serve React app for client-side routing only if a static build actually exists
 app.get('*', function(req, res, next) {
-  // Skip API/auth/static routes so they are handled by their routers or the 404 middleware.
-  // Calling next() allows existing route handlers (or the 404 handler) to respond.
-  if (req.path.startsWith('/api/') || 
-      req.path.startsWith('/auth/') || 
-      req.path.startsWith('/users/') ||
-      req.path.startsWith('/payment/')) {
-    return next();
-  }
-
-  // Serve the React app for client-side routes when the build exists.
   const indexPath = path.join(__dirname, 'client', 'build', 'index.html');
   if (fs.existsSync(indexPath)) {
+    if (req.path.startsWith('/api/') || 
+        req.path.startsWith('/auth/') || 
+        req.path.startsWith('/users/') ||
+        req.path.startsWith('/payment/')) {
+      return next();
+    }
     return res.sendFile(indexPath);
   }
 
-  // If client build is not available (common in dev), return a helpful 404 instead of ENOENT.
-  return next(createError(404, 'Client build not found. In development run the React dev server (npm start in /client) or build the client with `cd client && npm run build`.'));
+  // If client build is not available (e.g. backend running standalone on Render),
+  // forward to standard 404 handler
+  return next();
 });
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
-  next(createError(404));
+  next(createError(404, `Endpoint ${req.method} ${req.originalUrl} not found`));
 });
 
 // error handler (API-friendly)

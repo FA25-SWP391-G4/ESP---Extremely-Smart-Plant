@@ -14,7 +14,7 @@ import GoogleLoginButton from '@/components/auth/GoogleLoginButton';
 import { toast } from 'sonner';
 
 // API URL for redirect purposes
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010').replace(/\/$/, '');
 const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
 /**
@@ -169,8 +169,8 @@ export function LoginForm() {
     }
 
     try {
-      // backend runs on port 3010 by default in this project
-      const url = 'http://localhost:3010/auth/login';
+      const apiUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010').replace(/\/$/, '');
+      const url = `${apiUrl}/auth/login`;
       const payload = { email: formData.email, password: formData.password };
       const debug = process.env.NEXT_PUBLIC_DEBUG_LOGIN === 'true';
       if (debug) console.debug('[Login] Request URL:', url, 'payload:', payload);
