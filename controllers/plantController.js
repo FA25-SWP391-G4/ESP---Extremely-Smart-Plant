@@ -659,7 +659,7 @@ const getUserPlants = async (req, res) => {
                 SELECT soil_moisture, temperature, air_humidity, light_intensity, timestamp
                 FROM sensors_data
                 WHERE TRIM(device_key) = TRIM(p.device_key)
-                ORDER BY timestamp DESC
+                ORDER BY data_id DESC
                 LIMIT 1
             ) sd ON true
             WHERE p.user_id = $1
@@ -749,7 +749,7 @@ const getPlantById = async (req, res) => {
                     air_humidity AS humidity,
                     light_intensity AS light
                 FROM sensors_data
-                ORDER BY device_key, timestamp DESC
+                ORDER BY device_key, data_id DESC
             )
             SELECT 
                 p.*,
@@ -1127,7 +1127,7 @@ const getSensorHistory = async (req, res) => {
             FROM sensors_data sd
             INNER JOIN plants p ON TRIM(sd.device_key) = TRIM(p.device_key)
             WHERE p.plant_id = $1
-            ORDER BY sd.timestamp DESC
+            ORDER BY sd.data_id DESC
             LIMIT 100
         `;
 
@@ -1176,7 +1176,7 @@ const getCurrentSensorData = async (req, res) => {
             FROM sensors_data sd
             INNER JOIN plants p ON TRIM(sd.device_key) = TRIM(p.device_key)
             WHERE p.plant_id = $1
-            ORDER BY sd.timestamp DESC
+            ORDER BY sd.data_id DESC
             LIMIT 1
         `;
 

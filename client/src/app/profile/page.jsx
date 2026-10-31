@@ -63,7 +63,7 @@ const ProfilePage = () => {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL;
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010').replace(/\/$/, '');
       const token = getAuthToken();
 
       const response = await axios.put(

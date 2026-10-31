@@ -178,7 +178,7 @@ export function RegisterForm() {
       setRegisterStatus("Status: Connecting to API..."); // Update status
 
       // Use the correct API URL from environment variables
-      const API_URL = process.env.NEXT_PUBLIC_API_URL;
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010').replace(/\/$/, '');
       const response = await axios.post(`${API_URL}/auth/register`, apiPayload, {
         withCredentials: true, // Important for cookies/sessions
         headers: {

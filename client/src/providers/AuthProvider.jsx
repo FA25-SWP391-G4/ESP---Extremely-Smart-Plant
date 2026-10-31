@@ -97,7 +97,7 @@ export default function AuthProvider({ children }) {
       console.log('[AUTH PROVIDER] Calling logout endpoint...');
 
       // Call logout endpoint to clear HTTP-only cookie on server
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/auth/logout`, {
+      const response = await fetch(`${(process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '')}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
         headers: cookieToken ? {

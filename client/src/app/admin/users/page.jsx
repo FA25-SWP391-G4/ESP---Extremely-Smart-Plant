@@ -42,7 +42,7 @@ export default function AdminUsersPage() {
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL;
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010').replace(/\/$/, '');
       const token = getAuthToken();
 
       const response = await axios.get(`${API_URL}/admin/users`, {
@@ -72,7 +72,7 @@ export default function AdminUsersPage() {
 
     setIsSaving(true);
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL;
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010').replace(/\/$/, '');
       const token = getAuthToken();
 
       const response = await axios.put(
@@ -113,7 +113,7 @@ export default function AdminUsersPage() {
     }
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL;
+      const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010').replace(/\/$/, '');
       const token = getAuthToken();
 
       const response = await axios.delete(`${API_URL}/admin/users/${userId}`, {

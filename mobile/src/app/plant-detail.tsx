@@ -202,7 +202,7 @@ export default function PlantDetailScreen() {
           unit = '%';
         } else if (selectedHistoryMetric === 'light') {
           currentVal = sensors.light ?? 0;
-          unit = '%';
+          unit = ' lx';
         }
         return [{ time: 'Now', val: currentVal, unit }];
       }
@@ -224,7 +224,7 @@ export default function PlantDetailScreen() {
         unit = '%';
       } else if (selectedHistoryMetric === 'light') {
         val = item.light_intensity !== undefined ? item.light_intensity : (item.light ?? 0);
-        unit = '%';
+        unit = ' lx';
       }
 
       let timeLabel = `${idx + 1}`;
@@ -245,13 +245,18 @@ export default function PlantDetailScreen() {
 
   const metricStats = React.useMemo(() => {
     if (!trendData || trendData.length === 0) {
-      return { min: 0, avg: 0, max: 0, unit: selectedHistoryMetric === 'temperature' ? '°C' : '%' };
+      return { 
+        min: 0, 
+        avg: 0, 
+        max: 0, 
+        unit: selectedHistoryMetric === 'temperature' ? '°C' : (selectedHistoryMetric === 'light' ? ' lx' : '%') 
+      };
     }
     const vals = trendData.map((d) => d.val);
     const min = Math.min(...vals);
     const max = Math.max(...vals);
     const avg = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
-    const unit = trendData[0]?.unit || '%';
+    const unit = trendData[0]?.unit || (selectedHistoryMetric === 'temperature' ? '°C' : (selectedHistoryMetric === 'light' ? ' lx' : '%'));
     return { min, avg, max, unit };
   }, [trendData, selectedHistoryMetric]);
 
@@ -595,11 +600,11 @@ export default function PlantDetailScreen() {
                 </View>
                 <Text className="text-gray-400 text-[11px] font-medium">Light Exposure</Text>
                 <Text className="text-white text-2xl font-bold my-1">
-                  {sensors?.light !== undefined ? `${sensors.light}%` : '75%'}
+                  {sensors?.light !== undefined ? `${sensors.light} lx` : '750 lx'}
                 </Text>
                 <View className="h-1.5 bg-[#0F172A] rounded-full overflow-hidden mb-1.5">
                   <View 
-                    style={{ width: `${Math.min(100, sensors?.light ?? 75)}%` }}
+                    style={{ width: `${Math.min(100, Math.round(((sensors?.light ?? 750) / 2000) * 100))}%` }}
                     className="h-full bg-amber-400 rounded-full" 
                   />
                 </View>
@@ -941,7 +946,9 @@ export default function PlantDetailScreen() {
               ) : (
                 <View className="h-40 flex-row items-end justify-between pt-4 pb-2 border-b border-[#334155]">
                   {trendData.map((item, idx) => {
-                    const maxScale = selectedHistoryMetric === 'temperature' ? 50 : 100;
+                    const maxScale = selectedHistoryMetric === 'temperature' 
+                      ? 50 
+                      : (selectedHistoryMetric === 'light' ? Math.max(1000, ...trendData.map(d => d.val)) : 100);
                     const barHeight = Math.max(12, Math.min(100, (Math.max(0, item.val) / maxScale) * 100));
                     let barColor = 'bg-[#34D399]';
                     if (selectedHistoryMetric === 'moisture') {

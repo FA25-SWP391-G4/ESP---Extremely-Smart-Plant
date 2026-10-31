@@ -86,7 +86,7 @@ router.get('/history', authMiddleware, async (req, res) => {
             WHERE 
                 ${whereClause}
             ORDER BY 
-                sd.timestamp DESC
+                sd.data_id DESC
             LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
         `;
 

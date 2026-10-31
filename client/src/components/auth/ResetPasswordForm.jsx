@@ -9,7 +9,7 @@ import { Button } from '../ui/Button';
 import axios from 'axios';
 
 // Direct API URL - don't rely on the API client which might have issues
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010';
+const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3010').replace(/\/$/, '');
 
 /**
  * ResetPasswordForm component
